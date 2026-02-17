@@ -7,10 +7,17 @@ let peluruList = [];
 let nextSpawn = 0;
 
 class Mobil {
-  constructor(x,y,color){this.x=x;this.y=y;this.color=color;this.angle=0;this.width=40;this.height=20;}
-  maju(){this.x+=Math.cos(this.angle)*2;this.y+=Math.sin(this.angle)*2;}
-  mundur(){this.x-=Math.cos(this.angle)*2;this.y-=Math.sin(this.angle)*2;}
-  belokKiri(){this.angle-=0.05;} belokKanan(){this.angle+=0.05;}
+  constructor(x,y,color){
+    this.x=x;this.y=y;this.color=color;
+    this.angle=0;this.width=40;this.height=20;
+    this.inputs={up:false,down:false,left:false,right:false};
+  }
+  update(){
+    if(this.inputs.up) this.x+=Math.cos(this.angle)*2, this.y+=Math.sin(this.angle)*2;
+    if(this.inputs.down) this.x-=Math.cos(this.angle)*2, this.y-=Math.sin(this.angle)*2;
+    if(this.inputs.left) this.angle-=0.05;
+    if(this.inputs.right) this.angle+=0.05;
+  }
 }
 
 class Peluru {
@@ -33,8 +40,38 @@ wss.on("connection",(ws)=>{
     const p=players[ws.id];
     if(!p) return;
     if(data.type==="input"){
-      if(data.key==="ArrowUp") p.maju();
-      if(data.key==="ArrowDown") p.mundur();
+      if(data.key==="ArrowUp") p.inputs.up=data.state;
+      if(data.key==="ArrowDown") p.inputs.down=data.state;
+      if(data.key==="ArrowLeft") p.inputs.left=data.state;
+      if(data.key==="ArrowRight") p.inputs.right=data.state;
+      if(data.key==="shoot" && data.state){
+        peluruList.push(new Peluru(p.x,p.y,p.angle));
+      }
+    }
+  });
+
+  ws.on("close",()=>{delete players[ws.id];});
+});
+
+// Loop server: update semua benda & broadcast snapshot
+setInterval(()=>{
+  Object.values(players).forEach(p=>p.update());
+  peluruList.forEach(pl=>pl.update());
+  let snapshot={
+    type:"snapshot",
+    players:Object.entries(players).map(([id,p])=>({
+      id,color:p.color,x:p.x,y:p.y,angle:p.angle
+    })),
+    peluru:peluruList.map(pl=>({x:pl.x,y:pl.y,angle:pl.angle}))
+  };
+  wss.clients.forEach(client=>{
+    if(client.readyState===WebSocket.OPEN){
+      client.send(JSON.stringify(snapshot));
+    }
+  });
+},100);
+
+console.log(`Server running on port ${PORT}`);      if(data.key==="ArrowDown") p.mundur();
       if(data.key==="ArrowLeft") p.belokKiri();
       if(data.key==="ArrowRight") p.belokKanan();
       if(data.key==="shoot"){
