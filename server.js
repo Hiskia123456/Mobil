@@ -17,9 +17,9 @@ wss.on("connection", (ws) => {
     data.id = ws.id;
     data.color = ws.color;
 
-    // broadcast snapshot ke semua client
+    // broadcast snapshot ke semua client lain
     wss.clients.forEach(client => {
-      if (client.readyState === WebSocket.OPEN) {
+      if (client !== ws && client.readyState === WebSocket.OPEN) {
         client.send(JSON.stringify(data));
       }
     });
@@ -34,4 +34,4 @@ wss.on("connection", (ws) => {
   });
 });
 
-console.log(`WebSocket server running on port ${PORT}`);
+console.log(`WebSocket server running on port ${PORT}`);console.log(`WebSocket server running on port ${PORT}`);
