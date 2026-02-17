@@ -1,22 +1,26 @@
 const WebSocket = require("ws");
 const PORT = process.env.PORT || 8080;
-
 const wss = new WebSocket.Server({ port: PORT });
 
+let nextSpawn = 0; // ganti posisi awal bergantian
+
 wss.on("connection", (ws) => {
-  console.log("Client connected");
+  ws.id = Math.random().toString(36).substr(2,5);
+  ws.color = nextSpawn === 0 ? "blue" : "green";
+  ws.spawn = nextSpawn === 0 ? {x:300,y:350} : {x:300,y:50};
+  nextSpawn = (nextSpawn+1)%2; // bergantian
+
+  ws.send(JSON.stringify({type:"init", id:ws.id, color:ws.color, spawn:ws.spawn}));
 
   ws.on("message", (msg) => {
-    // broadcast ke semua client lain
+    const data = JSON.parse(msg);
+    data.id = ws.id;
+    data.color = ws.color;
     wss.clients.forEach(client => {
-      if (client !== ws && client.readyState === WebSocket.OPEN) {
-        client.send(msg);
+      if (client.readyState === WebSocket.OPEN) {
+        client.send(JSON.stringify(data));
       }
     });
-  });
-
-  ws.on("close", () => {
-    console.log("Client disconnected");
   });
 });
 
