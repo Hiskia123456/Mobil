@@ -13,16 +13,16 @@ class Mobil {
     this.inputs={up:false,down:false,left:false,right:false};
   }
   update(){
-    if(this.inputs.up) {this.x+=Math.cos(this.angle)*2; this.y+=Math.sin(this.angle)*2;}
-    if(this.inputs.down){this.x-=Math.cos(this.angle)*2; this.y-=Math.sin(this.angle)*2;}
-    if(this.inputs.left) this.angle-=0.05;
-    if(this.inputs.right) this.angle+=0.05;
+    if(this.inputs.up){ this.x+=Math.cos(this.angle)*2; this.y+=Math.sin(this.angle)*2; }
+    if(this.inputs.down){ this.x-=Math.cos(this.angle)*2; this.y-=Math.sin(this.angle)*2; }
+    if(this.inputs.left){ this.angle-=0.05; }
+    if(this.inputs.right){ this.angle+=0.05; }
   }
 }
 
 class Peluru {
-  constructor(x,y,a){this.x=x;this.y=y;this.angle=a;this.speed=6;}
-  update(){this.x+=Math.cos(this.angle)*this.speed;this.y+=Math.sin(this.angle)*this.speed;}
+  constructor(x,y,a){ this.x=x; this.y=y; this.angle=a; this.speed=6; }
+  update(){ this.x+=Math.cos(this.angle)*this.speed; this.y+=Math.sin(this.angle)*this.speed; }
 }
 
 wss.on("connection",(ws)=>{
@@ -35,6 +35,47 @@ wss.on("connection",(ws)=>{
 
   ws.send(JSON.stringify({type:"init",id:ws.id,color:color,spawn:spawn}));
 
+  ws.on("message",(msg)=>{
+    try {
+      const data=JSON.parse(msg);
+      const p=players[ws.id];
+      if(!p) return;
+      if(data.type==="input"){
+        if(data.key==="ArrowUp") p.inputs.up=data.state;
+        if(data.key==="ArrowDown") p.inputs.down=data.state;
+        if(data.key==="ArrowLeft") p.inputs.left=data.state;
+        if(data.key==="ArrowRight") p.inputs.right=data.state;
+        if(data.key==="shoot" && data.state){
+          peluruList.push(new Peluru(p.x,p.y,p.angle));
+        }
+      }
+    } catch(e){ console.error("Bad message",e); }
+  });
+
+  ws.on("close",()=>{ delete players[ws.id]; });
+});
+
+// Loop server
+setInterval(()=>{
+  Object.values(players).forEach(p=>p.update());
+  peluruList.forEach(pl=>pl.update());
+
+  let snapshot={
+    type:"snapshot",
+    players:Object.entries(players).map(([id,p])=>({
+      id,color:p.color,x:p.x,y:p.y,angle:p.angle
+    })),
+    peluru:peluruList.map(pl=>({x:pl.x,y:pl.y,angle:pl.angle}))
+  };
+
+  wss.clients.forEach(client=>{
+    if(client.readyState===WebSocket.OPEN){
+      client.send(JSON.stringify(snapshot));
+    }
+  });
+},100);
+
+console.log(`Server running on port ${PORT}`);
   ws.on("message",(msg)=>{
     try {
       const data=JSON.parse(msg);
